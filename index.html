@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>DM Eraser &mdash; Twitter Direct Message in Bulk, Fast Delete Direct Messages</title>
+	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+	<link href='http://fonts.googleapis.com/css?family=Source+Sans+Pro' rel='stylesheet' type='text/css'>
+	<style>
+		body {
+			margin:0;
+			font-family: 'Source Sans Pro', sans-serif;
+			text-align: center;
+		}
+
+		.welcome {
+			width: 300px;
+			height: 200px;
+			position: absolute;
+			left: 50%;
+			top: 20%;
+			margin-left: -150px;
+			margin-top: -100px;
+		}
+
+		a, a:visited {
+			text-decoration:none;
+			color: #55acee !important;
+		}
+
+		h1 {
+			font-size: 32px;
+			margin: 16px 0 0 0;
+		}
+
+		#btnStart {
+			color: #ffffff !important;
+			background: #55acee;
+			padding: 0px 10px 5px 10px;
+			margin-top: 20px;
+			display: block;
+		}
+		#btnStart i {
+			padding-top: 5px;
+			vertical-align: middle;
+		}
+		#btnStart a {
+			padding-top: 5px;
+			vertical-align: middle;
+		}
+		.warning {
+			color: #ff0000;
+			text-align: justify;
+		}
+		.credit {
+			color: #cccccc;
+			font-size: medium;
+		}
+	</style>
+
+	<script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+	<script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+
+	<script src="/oauth.min.js"></script>
+	<script type="text/javascript">
+	var oResult;
+	var iDeleted = 0;
+	var iTotal = 0;
+	var iIterations = 0;
+
+	var sLastId = "";
+	var iMaxPerRequest = 200;
+
+	// This function updates the user text
+	function fnUpdateText(selector, text) {
+		$(selector).text(text);
+	}
+
+	// This function loads the latest messages
+	function fnLoadMessages() {
+		iIterations++;
+
+		if (iIterations > 25) {
+			fnUpdateText("#usrStatus", "Max number of iterations reached. Please reload the page.");
+		} else {
+			fnUpdateText("#usrStatus", "Fetching message list...");
+
+			if (sLastId != "") {
+				var strUrl = '/1.1/direct_messages.json?count=' + iMaxPerRequest + '&max_id=' + sLastId;
+			} else {
+				var strUrl = '/1.1/direct_messages.json?count=' + iMaxPerRequest;
+			}
+			try {
+				oResult.get(strUrl).done(function(data) {
+					fnUpdateText("#usrStatus", "Last fetch successful.");
+					if (data.length == 0) {
+						fnUpdateText("#usrStatus", "No messages left to remove.");
+					} else {
+						$.each(data, function(idx, obj) {
+							sLastId = obj.id_str;
+
+							iTotal++;
+							fnUpdateText("#intTotal", iTotal);
+
+							setTimeout(function(){
+								try {
+								oResult.post('/1.1/direct_messages/destroy.json?id=' + obj.id_str).done(function(data) {
+									iDeleted++;
+									fnUpdateText("#intDeleted", iDeleted);
+
+									fnUpdateText("#usrStatus", "Message " + obj.id_str + " has been deleted.");
+								});
+								} catch (e) {
+									fnUpdateText("#usrStatus", "Error, message has already been deleted.");
+								}
+							}, Math.round(iTotal*1800));
+						});
+					}
+				});
+			} catch (e) {
+				$("#usrInfobox").hide();
+				$("#welcome").fadeIn();
+				$("#error").show();
+			}
+		}
+	}
+
+	// Initialise our OAuth library
+	OAuth.initialize('D5ayBsgiF5fZiPx2FD_6t7ZodIA');
+
+	// Once we're loaded, bind to the button
+	$(document).ready(function() {
+		$("#btnStart").click(function() {
+			OAuth.popup('twitter', function(err, result) {
+				if (result.errors) {
+					$("#usrInfobox").hide();
+					$("#welcome").fadeIn();
+					$("#error").show();
+				} else {
+					oResult = result;
+					result.get('/1.1/account/verify_credentials.json').done(function(data) {
+						$("#usrName").text('Hello ' + data.name + '.');
+						$("#usrProfileImage").attr("src", data.profile_image_url);
+						$("#usrInfobox").fadeIn();
+						$("#welcome").fadeOut();
+						fnUpdateText("#usrStatus", "Logged in successfully.");
+						setInterval("fnLoadMessages()", 15000);
+						fnLoadMessages();
+					});
+				}
+			});
+		});
+	});
+	</script>
+</head>
+<body>
+<div class="welcome">
+	<p><i class="fa fa-envelope-square" style="font-size: 250px; color: #55acee"></i></p>
+	<p>This utility will allow you to delete direct messages in bulk from Twitter.</p>
+	<p class="warning">Warning: If you connect this application to your Twitter account, it will remove all direct messages that are present within your account.</p>
+	<p class="warning">There is no reminder, no second chance and no undo.</p>
+	<p id="btnStart"><i class="fa fa-twitter fa-2x"></i> <a href="#">Sign in with Twitter</a></p>
+
+	<p class="credit">Written by <a href="http://dor.ky">Scott Wilcox</a> / <a href="http://twitter.com/ssx">@ssx</a></p>
+</div>
+
+<div id="usrInfobox" style="width: 40%; display: none;">
+	<h1>Total Messages: <span id="intTotal">0</span></h1>
+	<h1>Deleted so far: <span id="intDeleted">0</span></h1>
+	<h1 id="usrName"></h1><br />
+	<img src="" id="usrProfileImage" /><br />
+	<h4 id="usrStatus"></h4>
+</div>
+
+<div id="error" style="display: none;">
+	<p class="warning">Error: Your requests are being rate limited by Twitter. Please check back in 15 minutes.</p>
+</div>
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-52254909-1', 'dmeraser.com');
+  ga('send', 'pageview');
+</script>
+</body>
+</html>
+
